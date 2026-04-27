@@ -4,6 +4,7 @@
 import ast
 import importlib
 import os
+import time
 import warnings
 from collections import defaultdict
 from collections.abc import Callable
@@ -265,6 +266,9 @@ def run(example, args):
     viewer = example.viewer
     example_class = type(example)
 
+    render_interval = 1.0 / args.render_fps if (args is not None and args.render_fps > 0 and args.benchmark is False) else 0.0
+    last_render_time = 0.0
+
     perform_test = args is not None and args.test
     test_post_step = perform_test and hasattr(example, "test_post_step")
     test_final = perform_test and hasattr(example, "test_final")
@@ -293,6 +297,13 @@ def run(example, args):
                 example.step()
         if test_post_step:
             example.test_post_step()
+
+        if render_interval > 0.0:
+            now = time.monotonic()
+            wait = render_interval - (now - last_render_time)
+            if wait > 0.0:
+                time.sleep(wait)
+            last_render_time = time.monotonic()
 
         with wp.ScopedTimer("render", active=False):
             example.render()
@@ -481,6 +492,12 @@ def create_parser():
         action="store_true",
         default=False,
         help="Use the most aggressive process priority in benchmark mode.",
+    )
+    parser.add_argument(
+        "--render-fps",
+        type=float,
+        default=0.0,
+        help="Cap rendering frame rate in frames per second (0 = uncapped).",
     )
 
     return parser
